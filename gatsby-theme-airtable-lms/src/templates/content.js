@@ -4,7 +4,12 @@ import Content from "../components/Content";
 
 // some page query here
 export const query = graphql`
-  query($nodeID: String!) {
+  query(
+    $nodeID: String!
+    $githubObjectExpression: String!
+    $githubRepositoryName: String!
+    $githubRepositoryOwner: String!
+  ) {
     airtable(id: { eq: $nodeID }) {
       data {
         Content_URL_Prefix
@@ -12,6 +17,16 @@ export const query = graphql`
         Path
         Type
         View_on_Github
+      }
+    }
+    github {
+      repository(name: $githubRepositoryName, owner: $githubRepositoryOwner) {
+        object(expression: $githubObjectExpression) {
+          ... on Github_Blob {
+            id
+            text
+          }
+        }
       }
     }
   }

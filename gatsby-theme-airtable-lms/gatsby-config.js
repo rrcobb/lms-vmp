@@ -34,11 +34,12 @@ module.exports = ({ airtableApiKey, airtableBaseId, githubApiKey }) => ({
       resolve: `gatsby-source-graphql`,
       options: {
         typeName: "Github",
-        fieldname: "github",
+        fieldName: "github",
         url: "https://api.github.com/graphql",
         headers: {
           Authorization: `Bearer ${githubApiKey}`,
         },
-      }
+      },
+    },
   ],
 });
