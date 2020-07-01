@@ -1,6 +1,17 @@
 module.exports = ({ airtableApiKey, airtableBaseId, githubApiKey }) => ({
   plugins: [
     {
+      resolve: `gatsby-source-graphql`,
+      options: {
+        typeName: "Github",
+        fieldName: "github",
+        url: "https://api.github.com/graphql",
+        headers: {
+          Authorization: `Bearer ${githubApiKey}`,
+        },
+      },
+    },
+    {
       resolve: `gatsby-source-airtable`,
       options: {
         apiKey: airtableApiKey,
@@ -31,15 +42,7 @@ module.exports = ({ airtableApiKey, airtableBaseId, githubApiKey }) => ({
       },
     },
     {
-      resolve: `gatsby-source-graphql`,
-      options: {
-        typeName: "Github",
-        fieldName: "github",
-        url: "https://api.github.com/graphql",
-        headers: {
-          Authorization: `Bearer ${githubApiKey}`,
-        },
-      },
+      resolve: `gatsby-transformer-remark`,
     },
   ],
-});
+})

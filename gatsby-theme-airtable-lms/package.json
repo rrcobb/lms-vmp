@@ -6,7 +6,8 @@
   "license": "MIT",
   "peerDependencies": {
     "gatsby": "^2.6.0",
-    "gatsby-source-filesystem": "^2.3.14"
+    "gatsby-source-filesystem": "^2.3.14",
+    "gatsby-transformer-remark": "^2.8.20"
   },
   "dependencies": {
     "gatsby-source-airtable": "^2.1.1",
