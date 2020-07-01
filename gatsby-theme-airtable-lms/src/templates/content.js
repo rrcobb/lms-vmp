@@ -11,6 +11,14 @@ export const query = graphql`
       githubSourceUrl
       githubRepositoryName
       githubRepositoryOwner
+      childMarkdownRemark {
+        frontmatter {
+          title
+          layout
+        }
+        html
+        timeToRead
+      }
     }
   }
 `;
