@@ -1,3 +1,5 @@
+const GraphQLClient = require('graphql-request').GraphQLClient;
+
 exports.onPreBootstrap = (_, {airtableApiKey, githubApiKey}) => {
   if (!airtableApiKey) {
     throw new Error("Airtable LMS needs a valid Airtable API key");
@@ -18,15 +20,14 @@ exports.createSchemaCustomization = ({ actions }) => {
     githubRepositoryName: String
     githubRepositoryOwner: String
     githubObjectExpression: String
-    content: String
   }
   `);
 };
 //
 // From a path like:
-  // https://github.com/rrcobb/su-content/blob/master/wdp-vancouver/_lessons/week-01/03b-web-fonts.md
-  // To a object expression like:
-  // master:adp-vancouver/_slides/week-07/01-intro-to-tdd.md
+// https://github.com/rrcobb/su-content/blob/master/wdp-vancouver/_lessons/week-01/03b-web-fonts.md
+// To a object expression like:
+// master:adp-vancouver/_slides/week-07/01-intro-to-tdd.md
 const re = /https:\/\/github.com\/(?<author>[\w-]+)\/(?<repo>[\w-]+)\/blob\/(?<branch>\w+)\/(?<path>.+)/;
 
 const slugify = (str) =>
@@ -38,53 +39,73 @@ const slugify = (str) =>
 
 const transformDataFromAirtableNode = (airtableNode) => {
   let { author, branch, repo, path } = airtableNode.data.View_on_Github.match(re).groups;
-   return {
-      id: `${airtableNode.id}-content`,
-      slug: slugify(airtableNode.data.Name),
-      githubObjectExpression: `${branch}:${path}`,
-      githubSourceUrl: airtableNode.data.View_on_Github,
-      githubRepositoryName: repo,
-      githubRepositoryOwner: author,
-    };
+  return {
+    id: `${airtableNode.id}-content`,
+    slug: slugify(airtableNode.data.Name),
+    githubObjectExpression: `${branch}:${path}`,
+    githubSourceUrl: airtableNode.data.View_on_Github,
+    githubRepositoryName: repo,
+    githubRepositoryOwner: author,
+  };
 }
 
 // gatsby calls this when it's the plugin's turn to create nodes
 // we want to create nodes for LMS Content
 // And fill them with the markdown content from github
-exports.sourceNodes = async ({actions, getNodesByType, reporter, createContentDigest, createNodeId }) => {
-  const { createNode } = actions; 
+const buildQuery = ({githubRepositoryName, githubRepositoryOwner, githubObjectExpression}) => {
+  return `
+  query {
+      repository(name: "${githubRepositoryName}", owner: "${githubRepositoryOwner}") {
+        object(expression: "${githubObjectExpression}") {
+          ... on Blob {
+            id
+            text
+          }
+        }
+      }
+    }
+  `
+}
+
+exports.sourceNodes = async ({actions, getNodesByType, reporter, createContentDigest, createNodeId }, {githubApiKey}) => {
   const allAirtableNodes = getNodesByType("Airtable")
   const content = allAirtableNodes.filter(node => node.table === "Content")
-  content.forEach((airtableNode) => {
-    reporter.info(`making an airtable lms content node: ${airtableNode.data.Name}`)
-    createNode({
-      id: createNodeId(`LMS-Content-${airtableNode.id}`),
+  const contentQueries = content.map((airtableNode) => {
+    const data = transformDataFromAirtableNode(airtableNode);
+    return {
+      data,
+      query: buildQuery(data)
+    }
+  })
+
+  // setup for fetching straight from github api
+  const apiUrl = "https://api.github.com/graphql"
+  const headers = {
+    Authorization: `Bearer ${githubApiKey}`,
+  }
+  const client = new GraphQLClient(apiUrl, {
+    headers,
+  });
+
+  const responses = await Promise.all(
+    contentQueries
+    .map(({data, query}) => 
+      client.request(query).then(res => ({data, ...res}))
+    ))
+
+  responses.forEach(({data, ...response}) => {
+    // reporter.info(`github response: ${JSON.stringify(response)}`)
+    // reporter.info(`airtable data: ${JSON.stringify(data)}`)
+    actions.createNode({
+      id: createNodeId(`LMS-Content-${data.id}`),
       internal: {
         type: `AirtableLmsContent`,
-        contentDigest: createContentDigest(airtableNode.internal.contentDigest)
+        contentDigest: createContentDigest(data.id),
+        mediaType: 'text/markdown',
+        content: response.repository.object.text
       },
-      ...transformDataFromAirtableNode(airtableNode),
+      ...data,
     })
-    
-    // graphql query for github repo
-    // github {
-    //   repository(name: $githubRepositoryName, owner: $githubRepositoryOwner) {
-    //     object(expression: $githubObjectExpression) {
-    //       ... on Github_Blob {
-    //         id
-    //         text
-    //       }
-    //     }
-    //   }
-    // }   
-    // const textNode = {
-    //   internal: {
-    //     type: `AirtableLMSContentMarkdownBody`,
-    //     mediaType: "text/markdown",
-    //     content: node.body,
-    //     contentDigest: digest(node.body),
-    //   }
-    // }
   })
 }
 
